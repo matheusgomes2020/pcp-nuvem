@@ -28,10 +28,8 @@ except ImportError:
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E CSS CUSTOMIZADO
 # ==========================================
-# O "initial_sidebar_state='collapsed'" garante que não sobre nenhum resquício da barra lateral
 st.set_page_config(page_title="AçoNobre ERP", layout="wide", page_icon="🏭", initial_sidebar_state="collapsed")
 
-# Injeção de CSS para deixar o visual idêntico às imagens (Cards escuros, Banner Azul, Textos Amarelos)
 st.markdown("""
 <style>
     .box-azul {
@@ -59,12 +57,10 @@ st.markdown("""
     .item-title { color: #f1c40f; font-weight: bold; font-size: 16px; margin-bottom: 15px; }
     .item-linha { font-family: 'Courier New', Courier, monospace; font-size: 14px; color: #cccccc; margin-bottom: 10px; margin-left: 10px; line-height: 1.5; }
     
-    /* Centraliza os radio buttons do menu superior */
     div.row-widget.stRadio > div { flex-direction: row; justify-content: center; background-color: #1e1e1e; padding: 10px; border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# Inicializa variáveis de memória
 if 'carrinho' not in st.session_state: st.session_state.carrinho = []
 if 'pecas_temp_composto' not in st.session_state: st.session_state.pecas_temp_composto = []
 
@@ -464,7 +460,6 @@ def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pe
 # ==========================================
 st.markdown("<h2 style='text-align: center; color: #f1c40f; margin-bottom: 0;'>🏭 AçoNobre ERP</h2>", unsafe_allow_html=True)
 
-# Tira a barra lateral inteira e transforma o menu de navegação em abas horizontais no topo
 menu = st.radio(
     "Navegação Principal", 
     ["🛒 Projetista Virtual", "⚙️ Gerador de PCP"], 
@@ -479,14 +474,12 @@ st.markdown("---")
 if menu == "🛒 Projetista Virtual":
     col_esq, col_dir = st.columns([1.3, 2.7])
     
-    # ------------------ COLUNA ESQUERDA (INPUTS) ------------------
     with col_esq:
         st.markdown("#### 📦 DADOS DO PEDIDO")
         inp_pedido_nome = st.text_input("Nº do Pedido (Ex: 6885)", key="inp_pedido_global")
         
         aba_param, aba_comp, aba_livre = st.tabs(["📐 Catálogo Paramétrico", "🧩 Item Composto", "☕ Peça Avulsa"])
         
-        # --- ABA: CATÁLOGO PARAMÉTRICO ---
         with aba_param:
             c_qtd, c_planos = st.columns(2)
             qtd = c_qtd.number_input("QTD", min_value=1, value=1)
@@ -522,7 +515,6 @@ if menu == "🛒 Projetista Virtual":
                 st.session_state.carrinho.append(item)
                 st.rerun()
 
-        # --- ABA: ITEM COMPOSTO ---
         with aba_comp:
             c_qtd_item, c_nome_item = st.columns([1, 3])
             qtd_item_comp = c_qtd_item.number_input("QTD", min_value=1, value=1, key="qtd_comp")
@@ -565,7 +557,6 @@ if menu == "🛒 Projetista Virtual":
                 else:
                     st.warning("Insira um nome para o produto e adicione peças na lista!")
 
-        # --- ABA: PEÇA AVULSA ---
         with aba_livre:
             c_qtd_livre, c_nome_livre = st.columns([1, 3])
             qtd_livre = c_qtd_livre.number_input("QTD", min_value=1, value=1, key="qtd_livre")
@@ -589,7 +580,6 @@ if menu == "🛒 Projetista Virtual":
                     st.session_state.carrinho.append(item)
                     st.rerun()
 
-        # --- VISOR DO CARRINHO ---
         st.markdown("<hr>", unsafe_allow_html=True)
         if st.session_state.carrinho:
             df_carrinho = pd.DataFrame([{"Nº": i['num'], "QTD": i.get('qtd', i.get('qtd_item', 1)), "DESCRIÇÃO": i['desc_carrinho']} for i in st.session_state.carrinho])
@@ -600,7 +590,6 @@ if menu == "🛒 Projetista Virtual":
             st.session_state.carrinho = []
             st.rerun()
             
-        # O botão principal que dispara o cálculo
         gerar_calc = c_btn_gerar.button("🚀 CALCULAR PROJETO", type="primary", use_container_width=True)
             
     # ------------------ COLUNA DIREITA (DASHBOARD) ------------------
@@ -618,7 +607,6 @@ if menu == "🛒 Projetista Virtual":
                 peso_total_pedido = 0.0
                 custo_total_geral = 0.0
                 
-                # Prepara os blocos de HTML para a aba Dashboard (Estilo idêntico à imagem)
                 html_detalhamento = "<h4>📄 DETALHAMENTO DE FABRICAÇÃO POR ITEM</h4>"
                 
                 for item in st.session_state.carrinho:
@@ -646,26 +634,43 @@ if menu == "🛒 Projetista Virtual":
                     custo_unit_item_chapa = 0.0
                     custo_unit_item_tubo = 0.0
 
-                    # Inicia a "Carta" de Detalhamento do Item
                     html_detalhamento += f"<div class='card-dark'><div class='item-title'>ITEM {item['num']}: {item['qtd']}x {item['desc_carrinho']}</div>"
                     
                     for p in pb_cruas:
                         qtd_final = p["QTD"] * item["qtd"]
                         
                         if item["tipo"] == "parametrico":
-                            if "TUBO" in p["CÓDIGO"]: p["MAT_CUSTOM"] = "INOX 201 ESC"; p["ESP"] = 1.2
-                            elif p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]: p["MAT_CUSTOM"] = "-"
+                            if "TUBO" in p["CÓDIGO"]: 
+                                p["MAT_CUSTOM"] = "INOX 201 ESC"
+                                p["ESP"] = 1.2
+                            elif p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]: 
+                                p["MAT_CUSTOM"] = "-"
                             else:
-                                if "MAT_CUSTOM" not in p: p["MAT_CUSTOM"] = item["mat_tampo"]
-                        
+                                e_base = any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "DIVISÓRIA"])
+                                p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
+                                
+                                # A CORREÇÃO ENTRA AQUI: Se não for Estante ou Prat. Parede, a espessura da tela manda!
+                                if item["tampo_cod"] not in ["ESTANTE_LISA", "ESTANTE_GRADEADA", "PRAT_PAREDE"]:
+                                    esp_tela = item["esp_base"] if e_base else item["esp_tampo"]
+                                    if "CHAPA" in p["CÓDIGO"] and esp_tela != "Esp. Padrão":
+                                        if "REFORÇO" not in p["DESC"].upper():
+                                            try: 
+                                                p["ESP"] = float(esp_tela)
+                                            except: 
+                                                pass
+
+                        # Recalcula o peso unitário caso a espessura tenha mudado
+                        if "CHAPA" in p["CÓDIGO"] and p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-":
+                            p["PESO UNIT"] = float(p["COMP PL"]) * float(p["LARG PL"]) * p["ESP"] * 0.000008
+
                         custo_peca_un = 0.0
-                        mat_peca = p["MAT_CUSTOM"]
+                        mat_peca = p.get("MAT_CUSTOM", "-")
                         
                         # Custo Chapa
                         if "CHAPA" in p["CÓDIGO"]:
                             peso_peca = p.get("PESO UNIT", 0) * qtd_final
                             if p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-":
-                                for _ in range(qtd_final): pecas_para_nesting_global.append({'nome': p['DESC'], 'material': f"{mat_peca} {p['ESP']}mm", 'comp': float(p["COMP PL"]), 'larg': float(p["LARG PL"])})
+                                for _ in range(qtd_final): pecas_para_nesting_global.append({'nome': p['DESC'], 'material': f"{mat_peca} {p.get('ESP','-')}mm", 'comp': float(p["COMP PL"]), 'larg': float(p["LARG PL"])})
                             if p.get("ESP", 0) > 0:
                                 custo_peca_un = p["PESO UNIT"] * custo_chapa.get(mat_peca, {}).get(p["ESP"], 0.0)
                                 custo_unit_item_chapa += custo_peca_un * p["QTD"]
@@ -690,7 +695,6 @@ if menu == "🛒 Projetista Virtual":
                         mat_str = f"{mat_peca} - " if mat_peca != "-" else ""
                         custo_str = f"Custo un: R$ {custo_peca_un:.2f}".replace('.',',')
                         
-                        # Linha do item no HTML
                         html_detalhamento += f"<div class='item-linha'>&#x25AB; {qtd_final}x {mat_str}{p['DESC']} | {linha_med} | {custo_str}</div>"
                         
                         dados_para_df.append({
@@ -704,16 +708,13 @@ if menu == "🛒 Projetista Virtual":
                     peso_total_pedido += peso_item_total
                     html_detalhamento += f"<hr><div class='item-linha' style='color:#fff;'><b>CUSTO TOTAL DO ITEM: R$ {c_tot:.2f} | Peso: {peso_item_total:.2f} KG</b></div></div>".replace('.',',')
 
-                # Cálculo Final do Dashboard
                 custo_tot_chapas = sum([peso * custo_chapa.get(mat, {}).get(esp, 0.0) for (mat, esp), peso in resumo_geral_chapas.items()])
                 custo_tot_tubos = sum([(c_total / 1000.0) * custo_tubo.get(cod, 0.0) for cod, c_total in resumo_geral_tubos.items()])
                 custo_total_geral = custo_tot_chapas + custo_tot_tubos
                 
-                # Renderiza ABAS Principais dos Resultados
-                tab_lista, tab_dash = st.tabs(["✂️ Lista PCP e Mapas", "📊 Dashboard Financeiro"])
+                tab_lista, tab_dash = st.tabs(["✂️ Lista PCP e Mapas", "📊 Dashboard"])
                 
                 with tab_dash:
-                    # Banner Azul Exato da Imagem 2
                     titulo_pedido = f"CUSTO DO PEDIDO {inp_pedido_nome}" if inp_pedido_nome else "CUSTO DO PEDIDO AVULSO"
                     st.markdown(f"""
                     <div class="box-azul">
@@ -722,7 +723,6 @@ if menu == "🛒 Projetista Virtual":
                     </div>
                     """.replace(',', 'X').replace('.', ',').replace('X', '.'), unsafe_allow_html=True)
                     
-                    # Box de Chapas Inox
                     if resumo_geral_chapas:
                         html_chapas = "<div class='card-dark'><h4>📦 CONSUMO DE CHAPAS INOX</h4>"
                         for (mat, esp), peso in sorted(resumo_geral_chapas.items()):
@@ -733,7 +733,6 @@ if menu == "🛒 Projetista Virtual":
                         html_chapas += f"<p style='font-weight:bold; margin-top:10px;'>Peso Total em Chapas: {peso_total_pedido:.2f} KG</p></div>".replace('.',',')
                         st.markdown(html_chapas, unsafe_allow_html=True)
                             
-                    # Box de Tubos
                     if resumo_geral_tubos:
                         html_tubos = "<div class='card-dark'><h4>📎 CONSUMO DE TUBOS E PERFIS</h4>"
                         for cod, c_total in resumo_geral_tubos.items():
@@ -746,7 +745,6 @@ if menu == "🛒 Projetista Virtual":
                         html_tubos += "</div>"
                         st.markdown(html_tubos, unsafe_allow_html=True)
                         
-                    # Box de Nesting (Aproveitamento)
                     if HAS_NESTING and pecas_para_nesting_global:
                         html_nest = f"<div class='card-dark'><h4>🧩 ESTIMATIVA DE ENCAIXE (CHAPAS 3000x1250)</h4>"
                         agrup_nesting = {}
@@ -773,7 +771,6 @@ if menu == "🛒 Projetista Virtual":
                         html_nest += "</div>"
                         st.markdown(html_nest, unsafe_allow_html=True)
                         
-                    # Printa o detalhamento completo dos itens injetando o HTML que geramos lá em cima
                     st.markdown(html_detalhamento, unsafe_allow_html=True)
 
                 with tab_lista:
@@ -781,7 +778,6 @@ if menu == "🛒 Projetista Virtual":
                     df_lista = pd.DataFrame(dados_para_df)
                     st.dataframe(df_lista, hide_index=True, use_container_width=True)
                     
-                    # GERADOR DE EXCEL REAL
                     df_resumo = pd.DataFrame(linhas_resumo_excel)
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -790,7 +786,6 @@ if menu == "🛒 Projetista Virtual":
                     
                     st.download_button(label="📥 Baixar Excel Completo (PCP e Custos)", data=buffer.getvalue(), file_name=f'PCP_AcoNobre_{inp_pedido_nome}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', use_container_width=True)
                     
-                    # Renderiza Mapas de Corte abaixo da lista
                     if HAS_NESTING and pecas_para_nesting_global:
                         st.markdown("---")
                         st.markdown("#### 👁️ Mapas de Corte")
