@@ -6,3 +6,4 @@ PyMuPDF
 pypdf
 rectpack
 matplotlib
+ezdxf
