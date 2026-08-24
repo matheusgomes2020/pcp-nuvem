@@ -14,6 +14,12 @@ from openpyxl.utils import get_column_letter
 
 from regras_engenharia import calcular_mesa_parametrica, calcular_estante_parametrica, calcular_prateleira_parede
 
+try:
+    from rectpack import newPacker, PackingMode, PackingBin
+    HAS_NESTING = True
+except ImportError:
+    HAS_NESTING = False
+
 # Configuração da Página Web
 st.set_page_config(page_title="ERP AçoNobre", page_icon="🏭", layout="wide")
 
@@ -432,22 +438,22 @@ def atualizar_excel_inteligente(dados_novos, caminho_global, num_item):
         planilha_g = writer.sheets['Sheet1']
         for i in range(1, len(df_final.columns) + 1): planilha_g.column_dimensions[get_column_letter(i)].width = 22
 
-def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pedido, origem_pdf, origem_dxf, mapa_pdf, mapa_dxf, opcoes, log_widget):
-    log_widget.write(f"\n▶ Iniciando Item {n_item} -> Produto: {cod_pai}\n")
+def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pedido, origem_pdf, origem_dxf, mapa_pdf, mapa_dxf, opcoes, logger):
+    logger.write(f"\n▶ Iniciando Item {n_item} -> Produto: {cod_pai}\n")
     pasta_item = os.path.join(pasta_pedido, f"{n_item} - {cod_pai}")
     os.makedirs(pasta_item, exist_ok=True)
     
     if cod_pai not in mapa_pdf:
-        log_widget.write(f"❌ ERRO: PDF pai ({cod_pai}) não encontrado na pasta origem.\n")
+        logger.write(f"❌ ERRO: PDF pai ({cod_pai}) não encontrado na pasta origem.\n")
         return []
 
     caminho_pai = os.path.join(origem_pdf, mapa_pdf[cod_pai][".pdf"])
     caminho_pai_copiado = os.path.join(pasta_item, mapa_pdf[cod_pai][".pdf"])
     shutil.copy2(caminho_pai, caminho_pai_copiado)
     
-    log_widget.write(f"  📄 Lendo desenho pai: {mapa_pdf[cod_pai]['.pdf']}\n")
+    logger.write(f"  📄 Lendo desenho pai: {mapa_pdf[cod_pai]['.pdf']}\n")
     pecas = extrair_tabela_de_materiais(caminho_pai)
-    log_widget.write(f"  🔍 Encontradas {len(pecas)} peças na tabela. Extraindo dados (PDF/DXF)...\n")
+    logger.write(f"  🔍 Encontradas {len(pecas)} peças na tabela. Extraindo dados (PDF/DXF)...\n")
     
     dados_pcp = []
     merger = PdfWriter() if opcoes["pdf"] else None
@@ -461,7 +467,7 @@ def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pe
             tempo_laser_min = "-"
             tempo_laser_relogio = "-"
             
-            log_widget.write(f"    🔸 Lendo medidas de: {p['cod']} - {p['desc'][:15]}...\n")
+            logger.write(f"    🔸 Lendo medidas de: {p['cod']} - {p['desc'][:15]}...\n")
             
             if p['cod'] in mapa_pdf:
                 caminho_filho = os.path.join(origem_pdf, mapa_pdf[p['cod']][".pdf"])
@@ -473,7 +479,7 @@ def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pe
                     try: 
                         eng_dados = extrair_dados_tecnicos(caminho_filho)
                     except Exception as e: 
-                        log_widget.write(f"      [AVISO] Falha ao ler medidas do PDF {p['cod']}: {e}\n")
+                        logger.write(f"      [AVISO] Falha ao ler medidas do PDF {p['cod']}: {e}\n")
                     
                     if caminho_dxf_real:
                         try:
@@ -488,9 +494,9 @@ def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pe
                                 segundos_relogio = int(round((tempo_calc - minutos_relogio) * 60))
                                 tempo_laser_relogio = f"{minutos_relogio:02d}:{segundos_relogio:02d}s"
                                 
-                                log_widget.write(f"      ✂️ DXF Lido: {metros_corte} m | {entradas} Furos | Tempo: {tempo_laser_relogio} ({tempo_laser_min} min).\n")
+                                logger.write(f"      ✂️ DXF Lido: {metros_corte} m | {entradas} Furos | Tempo: {tempo_laser_relogio} ({tempo_laser_min} min).\n")
                         except Exception as e:
-                            log_widget.write(f"      [AVISO] Erro no DXF: {e}\n")
+                            logger.write(f"      [AVISO] Erro no DXF: {e}\n")
 
                 if opcoes["pdf"]:
                     caminho_filho_copiado = os.path.join(pasta_item, mapa_pdf[p['cod']][".pdf"])
@@ -523,19 +529,22 @@ def processar_item_unico(n_item, cod_pai, num_pedido, dados_comerciais, pasta_pe
         caminho_unificado = os.path.join(pasta_item, f"{cod_pai}-COMPLETO.pdf")
         merger.write(caminho_unificado)
         merger.close()
-        log_widget.write("  ✅ PDF Unificado gerado.\n")
+        logger.write("  ✅ PDF Unificado gerado.\n")
 
     if opcoes["conf"]:
         gerar_conferencia_item(n_item, cod_pai, pecas, pasta_item, num_pedido, dados_comerciais)
-        log_widget.write("  ✅ Lista de Conferência gerada.\n")
+        logger.write("  ✅ Lista de Conferência gerada.\n")
         
     return dados_pcp
 
 
 # ==========================================
-# 2. VARIÁVEIS DE SESSÃO E MAPAS
+# 2. VARIÁVEIS DE SESSÃO E MAPAS (STREAMLIT)
 # ==========================================
 if 'carrinho' not in st.session_state: st.session_state.carrinho = []
+if 'pecas_temp_composto' not in st.session_state: st.session_state.pecas_temp_composto = []
+if 'pecas_para_nesting_global' not in st.session_state: st.session_state.pecas_para_nesting_global = []
+
 if 'custo_chapa' not in st.session_state:
     st.session_state.custo_chapa = {
         "INOX 304": {0.6: 29.01, 0.8: 33.16, 1.0: 30.74, 1.2: 28.66, 1.5: 29.00, 2.0: 30.96},
@@ -545,8 +554,22 @@ if 'custo_chapa' not in st.session_state:
 if 'custo_tubo' not in st.session_state:
     st.session_state.custo_tubo = {"TUBO-RED-38": 18.47, "TUBO-RED-25": 12.08}
 
+# Tenta carregar do Excel se existir na pasta
+try:
+    df_chapas = pd.read_excel("CHAPAS.xlsx", sheet_name="CHAPAS")
+    st.session_state.custo_chapa["INOX 304"] = dict(zip(df_chapas[df_chapas['Aisi']==304]['Espessura'], df_chapas[df_chapas['Aisi']==304]['Custo última compra']))
+    st.session_state.custo_chapa["INOX 430"] = dict(zip(df_chapas[df_chapas['Aisi']==430]['Espessura'], df_chapas[df_chapas['Aisi']==430]['Custo última compra']))
+    df_tubos = pd.read_excel("CHAPAS.xlsx", sheet_name="TUBOS")
+    for _, r in df_tubos.iterrows():
+        if "016.201.020" in str(r['Código']): st.session_state.custo_tubo["TUBO-RED-38"] = float(r['Custo última compra'])
+        elif "016.201.014" in str(r['Código']): st.session_state.custo_tubo["TUBO-RED-25"] = float(r['Custo última compra'])
+except: pass
+
 mapa_tampo = {"Mesa Lisa": "LISA", "Mesa com Encosto": "ENCOSTO", "Pia com Cuba": "PIA", "Prateleira Parede": "PRAT_PAREDE", "Estante Lisa": "ESTANTE_LISA", "Estante Gradeada": "ESTANTE_GRADEADA"}
 mapa_base = {"Contraventamento": "CONTRAVENTAMENTO", "Prat. Lisa": "PRAT_LISA", "Prat. Lisa Dupla": "PRAT_LISA_DUPLA", "Prat. Gradeada": "PRAT_GRADEADA", "Prat. Gradeada Dupla": "PRAT_GRADEADA_DUPLA"}
+
+dim_chapa_x = 3000
+dim_chapa_y = 1250
 
 # ==========================================
 # 3. INTERFACE PRINCIPAL
@@ -563,8 +586,9 @@ with tab_projetista:
         st.subheader("📦 Montar Pedido")
         pedido_num = st.text_input("Nº do Pedido (Ex: 6885)")
 
-        aba_param, aba_livre = st.tabs(["📐 Catálogo Paramétrico", "✏️ Peça Avulsa"])
+        aba_param, aba_comp, aba_livre = st.tabs(["📐 Catálogo Paramétrico", "🧩 Item Composto", "✏️ Peça Avulsa"])
         
+        # --- 3.1 ABA PARAMÉTRICO ---
         with aba_param:
             c1, c2, c3 = st.columns(3)
             qtd = c1.number_input("QTD", min_value=1, value=1)
@@ -608,7 +632,6 @@ with tab_projetista:
 
             st.markdown("---")
             st.markdown("**Engenharia de Reforços**")
-            
             lbl_ref1 = "Ref. Plano" if "ESTANTE" in cod_tampo else "Reforço" if cod_tampo == "PRAT_PAREDE" else "Ref. Tampo"
             
             c_r1, c_r2, c_r3 = st.columns(3)
@@ -642,30 +665,102 @@ with tab_projetista:
                 else: 
                     if item["base_cod"] == "CONTRAVENTAMENTO": item["desc_carrinho"] = f"{item['tampo_nome']} c/ {item['base_nome']} ({int(item['comp'])}x{int(item['larg'])}x{int(item['alt'])}) - {item['mat_tampo']}"
                     else: item["desc_carrinho"] = f"{item['tampo_nome']} c/ {item['base_nome']} ({int(item['comp'])}x{int(item['larg'])}x{int(item['alt'])}) - Tampo {item['mat_tampo']} / Prat. {item['mat_base']}"
+                
                 st.session_state.carrinho.append(item)
                 st.rerun()
+
+        # --- 3.2 ABA ITEM COMPOSTO ---
+        with aba_comp:
+            cc1, cc2 = st.columns([1, 2])
+            qtd_item_comp = cc1.number_input("QTD Módulo", min_value=1, value=1)
+            nome_item_comp = cc2.text_input("Nome Módulo", placeholder="Ex: Gaveteiro")
+            
+            st.markdown("**Inserir Peças:**")
+            cp1, cp2 = st.columns([2, 1])
+            nome_pc = cp1.text_input("Nome da Peça")
+            qtd_pc = cp2.number_input("QTD Peça", min_value=1, value=1)
+            
+            cp3, cp4, cp5, cp6 = st.columns([1, 1, 1, 1])
+            comp_pc = cp3.number_input("C(mm) ", value=0.0)
+            larg_pc = cp4.number_input("L(mm) ", value=0.0)
+            mat_pc = cp5.selectbox("Mat", ["304", "430", "201"])
+            esp_pc = cp6.selectbox("Esp", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2)
+
+            if st.button("⏬ Inserir Peça no Módulo", use_container_width=True):
+                if nome_pc and comp_pc > 0 and larg_pc > 0:
+                    st.session_state.pecas_temp_composto.append({
+                        "nome": nome_pc, "qtd": qtd_pc, "comp": comp_pc, "larg": larg_pc, 
+                        "mat": f"INOX {mat_pc}", "esp": float(esp_pc)
+                    })
+                    st.rerun()
+            
+            if st.session_state.pecas_temp_composto:
+                st.dataframe(pd.DataFrame(st.session_state.pecas_temp_composto), use_container_width=True)
+                if st.button("✅ EMPACOTAR ITEM E ADD", type="primary", use_container_width=True):
+                    item = {
+                        "num": len(st.session_state.carrinho)+1, "tipo": "composto", 
+                        "nome_item": nome_item_comp if nome_item_comp else "Item Composto", 
+                        "qtd_item": qtd_item_comp, "pecas": list(st.session_state.pecas_temp_composto),
+                        "desc_carrinho": f"🧩 {nome_item_comp if nome_item_comp else 'Módulo Composto'}"
+                    }
+                    st.session_state.carrinho.append(item)
+                    st.session_state.pecas_temp_composto.clear()
+                    st.rerun()
+
+        # --- 3.3 ABA PEÇA AVULSA ---
+        with aba_livre:
+            cl1, cl2 = st.columns([1, 2])
+            qtd_livre = cl1.number_input("QTD Avulsa", min_value=1, value=1)
+            nome_livre = cl2.text_input("Nome da Peça Avulsa")
+            
+            cl3, cl4 = st.columns(2)
+            comp_livre = cl3.number_input("C Planif (mm)", value=0.0)
+            larg_livre = cl4.number_input("L Planif (mm)", value=0.0)
+            
+            cl5, cl6 = st.columns(2)
+            mat_livre = cl5.selectbox("Material", ["INOX 304", "INOX 430", "INOX 201"])
+            esp_livre = cl6.selectbox("Espessura", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2)
+
+            if st.button("➕ Adicionar Peça Solta", type="primary", use_container_width=True):
+                if nome_livre and comp_livre > 0 and larg_livre > 0:
+                    item = {
+                        "num": len(st.session_state.carrinho)+1, "tipo": "livre", 
+                        "qtd": qtd_livre, "nome_peca": nome_livre, 
+                        "comp_pl": comp_livre, "larg_pl": larg_livre, 
+                        "esp": float(esp_livre), "material": mat_livre,
+                        "desc_carrinho": f"✏️ {nome_livre}"
+                    }
+                    st.session_state.carrinho.append(item)
+                    st.rerun()
 
         st.markdown("### 🛒 Carrinho")
         if st.session_state.carrinho:
             for idx, it in enumerate(st.session_state.carrinho):
-                st.info(f"**{it['qtd']}x** {it['desc_carrinho']}")
+                st.info(f"**{it.get('qtd', it.get('qtd_item', 1))}x** {it['desc_carrinho']}")
             if st.button("❌ Limpar Carrinho", use_container_width=True):
                 st.session_state.carrinho = []
                 st.rerun()
         else:
             st.warning("Carrinho vazio.")
 
-    # ----------------- TELA DE RESULTADOS DO PROJETISTA -----------------
+    # ----------------- TELA DE RESULTADOS DO PROJETISTA (DASHBOARD COMPLETA) -----------------
     with col_dir:
-        st.subheader("📊 Dashboard de Fabricação")
+        st.subheader("📊 Painel de PCP & Engenharia")
+        
         if st.session_state.carrinho:
+            aba_lista_pcp, aba_dashboard = st.tabs(["✂️ Lista de Corte", "📈 Dashboard Financeiro"])
+            
             dados_para_df = []
+            st.session_state.pecas_para_nesting_global = []
             resumo_geral_chapas = {}
             resumo_geral_tubos = {}
             peso_total_pedido = 0.0
+            custo_total_geral = 0.0
 
+            # --- PROCESSAMENTO DO CARRINHO (Motor Universal) ---
             for item in st.session_state.carrinho:
                 pecas_base = []
+                
                 if item["tipo"] == "parametrico":
                     if "ESTANTE" in item["tampo_cod"]:
                         tipo_est = "LISA" if "LISA" in item["tampo_cod"] else "GRADEADA"
@@ -676,6 +771,8 @@ with tab_projetista:
                         pb_cruas = calcular_mesa_parametrica(item["comp"], item["larg"], item["alt"], item["tampo_cod"], item["base_cod"])
 
                     molde_reforco = None
+
+                    # LAÇO INTELIGENTE E INJEÇÃO DE REFORÇOS
                     for p in pb_cruas:
                         if p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]:
                             p["MAT_CUSTOM"] = "-"
@@ -686,14 +783,10 @@ with tab_projetista:
                                 
                             if is_reforco:
                                 is_traseiro = False; is_prat = False; is_plano = False; is_tampo = False
-                                if "MAIOR" in p["DESC"].upper():
-                                    p["DESC"] = "REFORÇO TRASEIRO DO TAMPO"; is_traseiro = True
-                                elif "PRAT" in p["DESC"].upper() or "BASE" in p["DESC"].upper():
-                                    p["DESC"] = "REFORÇO PRATELEIRA"; is_prat = True
-                                elif "PLANO" in p["DESC"].upper() or "ESTANTE" in item["tampo_cod"]:
-                                    p["DESC"] = "REFORÇO PLANO"; is_plano = True
-                                else:
-                                    p["DESC"] = "REFORÇO TAMPO"; is_tampo = True
+                                if "MAIOR" in p["DESC"].upper(): p["DESC"] = "REFORÇO TRASEIRO DO TAMPO"; is_traseiro = True
+                                elif "PRAT" in p["DESC"].upper() or "BASE" in p["DESC"].upper(): p["DESC"] = "REFORÇO PRATELEIRA"; is_prat = True
+                                elif "PLANO" in p["DESC"].upper() or "ESTANTE" in item["tampo_cod"]: p["DESC"] = "REFORÇO PLANO"; is_plano = True
+                                else: p["DESC"] = "REFORÇO TAMPO"; is_tampo = True
                                     
                                 if is_traseiro:
                                     p["MAT_CUSTOM"] = item["mat_tampo"]
@@ -702,31 +795,30 @@ with tab_projetista:
                                     p["MAT_CUSTOM"] = item.get("mat_ref_prat", "INOX 430")
                                     try: p["ESP"] = float(item.get("esp_ref_prat", "0.8"))
                                     except: p["ESP"] = 0.8
-                                    qtd = item.get("qtd_ref_prat", "Padrão")
-                                    if qtd != "Padrão":
-                                        if qtd == "0": continue
+                                    qtd_r = item.get("qtd_ref_prat", "Padrão")
+                                    if qtd_r != "Padrão":
+                                        if qtd_r == "0": continue
                                         mult = 2 if "DUPLA" in item.get("base_cod", "") else 1
-                                        p["QTD"] = int(qtd) * mult
+                                        p["QTD"] = int(qtd_r) * mult
                                 elif is_plano:
                                     p["MAT_CUSTOM"] = item.get("mat_ref", "INOX 430")
                                     try: p["ESP"] = float(item.get("esp_ref", "0.8"))
                                     except: p["ESP"] = 0.8
-                                    qtd = item.get("qtd_ref", "Padrão")
-                                    if qtd != "Padrão":
-                                        if qtd == "0": continue
-                                        p["QTD"] = int(qtd) * item.get("planos", 4)
+                                    qtd_r = item.get("qtd_ref", "Padrão")
+                                    if qtd_r != "Padrão":
+                                        if qtd_r == "0": continue
+                                        p["QTD"] = int(qtd_r) * item.get("planos", 4)
                                 elif is_tampo:
                                     p["MAT_CUSTOM"] = item.get("mat_ref", "INOX 430")
                                     try: p["ESP"] = float(item.get("esp_ref", "0.8"))
                                     except: p["ESP"] = 0.8
-                                    qtd = item.get("qtd_ref", "Padrão")
-                                    if qtd != "Padrão":
-                                        if qtd == "0": continue
-                                        p["QTD"] = int(qtd)
+                                    qtd_r = item.get("qtd_ref", "Padrão")
+                                    if qtd_r != "Padrão":
+                                        if qtd_r == "0": continue
+                                        p["QTD"] = int(qtd_r)
                             else:
                                 e_base = False
-                                if "TUBO" in p["CÓDIGO"] or any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA"]):
-                                    e_base = True
+                                if "TUBO" in p["CÓDIGO"] or any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA"]): e_base = True
                                 if item["tampo_cod"] == "PRAT_PAREDE": e_base = False
                                     
                                 p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
@@ -748,11 +840,11 @@ with tab_projetista:
                             ref_prat["MAT_CUSTOM"] = item.get("mat_ref_prat", "INOX 430")
                             try: ref_prat["ESP"] = float(item.get("esp_ref_prat", "0.8"))
                             except: ref_prat["ESP"] = 0.8
-                            qtd = item.get("qtd_ref_prat", "Padrão")
+                            qtd_r = item.get("qtd_ref_prat", "Padrão")
                             mult = 2 if "DUPLA" in item.get("base_cod", "") else 1
-                            if qtd != "Padrão":
-                                if qtd == "0": ref_prat = None
-                                else: ref_prat["QTD"] = int(qtd) * mult
+                            if qtd_r != "Padrão":
+                                if qtd_r == "0": ref_prat = None
+                                else: ref_prat["QTD"] = int(qtd_r) * mult
                             else: ref_prat["QTD"] = ref_prat.get("QTD", 1) * mult
                                 
                             if ref_prat:
@@ -761,65 +853,135 @@ with tab_projetista:
                                     except: pass
                                 pecas_base.append(ref_prat)
 
+                elif item["tipo"] == "composto":
+                    for pt in item["pecas"]:
+                        peso_un = pt["comp"] * pt["larg"] * pt["esp"] * 0.000008
+                        pecas_base.append({"CÓDIGO": "CHAPA_LIVRE", "DESC": pt["nome"], "QTD": pt["qtd"], "COMP PL": pt["comp"], "LARG PL": pt["larg"], "ESP": pt["esp"], "PESO UNIT": peso_un, "MAT_CUSTOM": pt["mat"]})
+                
+                elif item["tipo"] == "livre":
+                    peso_un = item["comp_pl"] * item["larg_pl"] * item["esp"] * 0.000008
+                    pecas_base.append({"CÓDIGO": "CHAPA_LIVRE", "DESC": item["nome_peca"], "QTD": 1, "COMP PL": item["comp_pl"], "LARG PL": item["larg_pl"], "ESP": item["esp"], "PESO UNIT": peso_un, "MAT_CUSTOM": item["material"]})
+
+                # --- RENDERIZAÇÃO DO CARD DETALHADO POR ITEM NA ABA LISTA ---
+                qtd_multiplicador = item.get("qtd", item.get("qtd_item", 1))
+                peso_item_total = 0.0
+                custo_unit_item = 0.0
+                
+                linhas_ui_item = []
+
                 for p in pecas_base:
-                    qtd_final = p["QTD"] * item["qtd"]
+                    qtd_final = p["QTD"] * qtd_multiplicador
                     peso_total_final = p["PESO UNIT"] * qtd_final
                     mat_peca = p.get("MAT_CUSTOM", "-")
+                    desc_final = p["DESC"]
+                    custo_peca_un = 0.0
                     med = f"{p['COMP PL']}x{p['LARG PL']}" if p['LARG PL'] != "-" else f"{p['COMP PL']}mm" if p['COMP PL'] != "-" else "-"
                     esp_str = str(p['ESP']).replace('.', ',') if p['ESP'] > 0 else "-"
 
                     if "CHAPA" in p["CÓDIGO"] or (p["COMP PL"] != "-" and p["LARG PL"] != "-"):
+                        if p["LARG PL"] != "-":
+                            for _ in range(qtd_final): st.session_state.pecas_para_nesting_global.append({'nome': p['DESC'], 'material': f"{mat_peca} {p['ESP']}mm", 'comp': float(p["COMP PL"]), 'larg': float(p["LARG PL"])})
                         if p["ESP"] > 0:
+                            custo_peca_un = p["PESO UNIT"] * st.session_state.custo_chapa.get(mat_peca, {}).get(p["ESP"], 0.0)
+                            custo_unit_item += custo_peca_un * p["QTD"]
                             chave = (mat_peca, p["ESP"])
                             resumo_geral_chapas[chave] = resumo_geral_chapas.get(chave, 0) + peso_total_final
+                        linha_medida = f"{p['PESO UNIT']:.2f} KG un. | {peso_total_final:.2f} KG tot."
                     elif "TUBO" in p["CÓDIGO"]:
+                        metros_unit = float(p["COMP PL"]) / 1000.0
+                        metros_tot = metros_unit * qtd_final
+                        custo_peca_un = metros_unit * st.session_state.custo_tubo.get(p["CÓDIGO"], 0.0)
+                        custo_unit_item += custo_peca_un * p["QTD"]
                         resumo_geral_tubos[p["CÓDIGO"]] = resumo_geral_tubos.get(p["CÓDIGO"], 0) + (float(p["COMP PL"]) * qtd_final)
+                        linha_medida = f"{metros_unit:.2f} M un.  | {metros_tot:.2f} M tot."
+                    else:
+                        linha_medida = "- | -"
+
+                    linhas_ui_item.append(f"▫ **{qtd_final}x {mat_peca} - {desc_final}** | {linha_medida} | R$ {custo_peca_un:.2f}")
 
                     dados_para_df.append({
                         "ITEM": f"Item {item['num']}", "QTD": qtd_final, "CÓDIGO PEÇA": p['CÓDIGO'], 
                         "DESCRIÇÃO": p['DESC'], "MATERIAL": mat_peca, "ESPESSURA": esp_str, 
                         "MEDIDA CORTE": med, "PESO UNIT (KG)": round(p['PESO UNIT'],2), "PESO TOTAL (KG)": round(peso_total_final,2)
                     })
+                    peso_item_total += peso_total_final
 
+                c_tot = custo_unit_item * qtd_multiplicador
+                peso_total_pedido += peso_item_total
+                
+                with aba_lista_pcp:
+                    with st.expander(f"▶ ITEM {item['num']}: {qtd_multiplicador}x {item['desc_carrinho']} (R$ {c_tot:.2f})"):
+                        for linha in linhas_ui_item:
+                            st.markdown(linha.replace('.', ','))
+                        st.info(f"**Custo Unitário:** R$ {custo_unit_item:.2f} | **Custo Total:** R$ {c_tot:.2f} | **Peso Total:** {peso_item_total:.2f} KG".replace('.', ','))
+
+            # --- POPULANDO A ABA DASHBOARD ---
             custo_tot_chapas = sum([peso * st.session_state.custo_chapa.get(mat, {}).get(esp, 0.0) for (mat, esp), peso in resumo_geral_chapas.items()])
             custo_tot_tubos = sum([(c_total / 1000.0) * st.session_state.custo_tubo.get(cod, 0.0) for cod, c_total in resumo_geral_tubos.items()])
             custo_total_geral = custo_tot_chapas + custo_tot_tubos
 
-            st.success(f"💰 **Custo Total Fabril:** R$ {custo_total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-            
-            g1, g2 = st.columns(2)
-            with g1:
-                st.markdown("**📦 Consumo de Chapas**")
-                for (mat, esp), peso in sorted(resumo_geral_chapas.items()):
-                    st.write(f"• {mat} {esp}mm: **{peso:.2f} KG**")
-            with g2:
-                st.markdown("**📏 Consumo de Tubos**")
-                for cod, c_total in resumo_geral_tubos.items():
-                    mts = c_total / 1000.0
-                    barras = mts / 6.0
-                    st.write(f"• {cod}: **{mts:.2f} m** ({barras:.1f} un)")
-
-            df_lista = pd.DataFrame(dados_para_df)
-            st.dataframe(df_lista, use_container_width=True, hide_index=True)
-
-            if not df_lista.empty:
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_lista.to_excel(writer, index=False, sheet_name='Lista_Corte')
-                excel_data = output.getvalue()
+            with aba_dashboard:
+                st.success(f"### 💰 Custo Total Fabril: R$ {custo_total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
                 
-                st.download_button(
-                    label="📥 Baixar Excel do PCP",
-                    data=excel_data,
-                    file_name=f"PCP_Pedido_{pedido_num}.xlsx" if pedido_num else "PCP_Orcamento.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+                g1, g2 = st.columns(2)
+                with g1:
+                    st.markdown("#### 📦 Consumo de Chapas INOX")
+                    for (mat, esp), peso in sorted(resumo_geral_chapas.items()):
+                        prc = st.session_state.custo_chapa.get(mat, {}).get(esp, 0.0)
+                        st.write(f"• {mat} {esp}mm ➔ **{peso:.2f} KG** (R$ {prc:.2f}/kg) | Sub: R$ {peso*prc:.2f}".replace('.', ','))
+                    st.caption(f"Peso Total em Chapas: {peso_total_pedido:.2f} KG".replace('.', ','))
+                with g2:
+                    st.markdown("#### 📏 Consumo de Tubos e Perfis")
+                    for cod, c_total in resumo_geral_tubos.items():
+                        mts = c_total / 1000.0
+                        prc = st.session_state.custo_tubo.get(cod, 0.0)
+                        st.write(f"• {cod} ➔ **{mts:.2f} Mts** ({(mts/6.0):.1f} barras) | Sub: R$ {mts*prc:.2f}".replace('.', ','))
+
+                # --- MOTOR DE NESTING (APROVEITAMENTO) ---
+                if HAS_NESTING and st.session_state.pecas_para_nesting_global:
+                    st.markdown("---")
+                    st.markdown(f"#### 🧩 Estimativa de Encaixe de Chapa ({dim_chapa_x}x{dim_chapa_y})")
+                    agrup_nesting = {}
+                    for pc in st.session_state.pecas_para_nesting_global:
+                        chave = pc['material']
+                        if chave not in agrup_nesting: agrup_nesting[chave] = []
+                        agrup_nesting[chave].append((pc['comp'], pc['larg']))
+                    
+                    for mat_nome, dimensoes in agrup_nesting.items():
+                        packer = newPacker(mode=PackingMode.Offline, bin_algo=PackingBin.Global, rotation=True)
+                        for idx, (c, l) in enumerate(dimensoes): packer.add_rect(width=c + 5, height=l + 5, rid=idx)
+                        for _ in range(50): packer.add_bin(width=dim_chapa_x, height=dim_chapa_y)
+                        packer.pack()
+                        chp_usadas = len(packer)
+                        area_pc = sum([c * l for c, l in dimensoes])
+                        area_ch = chp_usadas * (dim_chapa_x * dim_chapa_y)
+                        aprov = (area_pc / area_ch) * 100 if area_ch > 0 else 0
+                        st.write(f"• **{mat_nome}:** Será preciso puxar **{chp_usadas} chapa(s)** do estoque. (Aproveitamento: {aprov:.1f}%)".replace('.', ','))
+
+            # Exibe Tabela Final unificada no final da aba Lista PCP
+            with aba_lista_pcp:
+                st.markdown("---")
+                df_lista = pd.DataFrame(dados_para_df)
+                st.dataframe(df_lista, use_container_width=True, hide_index=True)
+
+                if not df_lista.empty:
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df_lista.to_excel(writer, index=False, sheet_name='Lista_Corte')
+                    excel_data = output.getvalue()
+                    
+                    st.download_button(
+                        label="📥 Baixar Excel Completo do Pedido",
+                        data=excel_data,
+                        file_name=f"PCP_Pedido_{pedido_num}.xlsx" if pedido_num else "PCP_Orcamento.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
 
 # ----------------- ABA PCP (ARQUIVOS LOCAIS / REDE) -----------------
 with tab_pcp:
     st.subheader("⚙️ Gerador de PCP (Pastas de Rede / Físicas)")
-    st.info("⚠️ *Aviso: O Streamlit lerá as pastas abaixo se você estiver executando o comando 'streamlit run' em uma máquina que tenha acesso à rede (Ex: \\Servidor).*")
+    st.info("⚠️ *Aviso: O Streamlit lerá as pastas abaixo se você estiver executando o comando 'streamlit run' em uma máquina que tenha acesso à rede (Ex: \\\\Servidor).*")
 
     col1, col2 = st.columns(2)
     pasta_pdf = col1.text_input("Pasta Origem (PDFs):", value=r"\\Servidor\aco_nobre\5 - ENG DESENV\00-PROJETOS\NOVA CODIFICAÇÃO\PDF")
@@ -850,7 +1012,7 @@ with tab_pcp:
         if not pasta_pdf or not pasta_destino:
             st.error("Preencha as pastas de Origem (PDFs) e Destino.")
         else:
-            # Emulador do Log Visual para o Streamlit
+            # Emulador do Log Visual para o Streamlit (Uma caixa preta de console via st.code)
             log_placeholder = st.empty()
             class StLogger:
                 def __init__(self, ph):
@@ -858,7 +1020,7 @@ with tab_pcp:
                     self.log = ""
                 def write(self, txt):
                     self.log += txt
-                    self.ph.text(self.log)
+                    self.ph.code(self.log, language="bash")
             logger = StLogger(log_placeholder)
             
             opcoes = {"pdf": chk_pdf, "conf": chk_conf, "pcp": chk_pcp}
