@@ -90,71 +90,71 @@ col_esq, col_dir = st.columns([1.5, 2.5], gap="large")
 
 with col_esq:
     st.markdown("<h4 style='margin-bottom:0px;'>📦 DADOS DO PEDIDO</h4>", unsafe_allow_html=True)
-    inp_pedido_nome = st.text_input("Nº do Pedido", placeholder="Ex: 6885", label_visibility="collapsed")
+    inp_pedido_nome = st.text_input("Nº do Pedido", placeholder="Ex: 6885", label_visibility="collapsed", key="pedido_global")
     
     aba_param, aba_comp, aba_livre = st.tabs(["📐 Catálogo Paramétrico", "🧩 Módulo Composto", "☕ Peça Avulsa"])
     
     # ------------------ CATÁLOGO PARAMÉTRICO ------------------
     with aba_param:
         cp_prod, cp_base = st.columns(2, gap="small")
-        tampo_nome = cp_prod.selectbox("Produto Principal", list(mapa_tampo.keys()))
+        tampo_nome = cp_prod.selectbox("Produto Principal", list(mapa_tampo.keys()), key="sel_prod_prin")
         cod_tampo = mapa_tampo[tampo_nome]
         
         if "ESTANTE" in cod_tampo or cod_tampo == "PRAT_PAREDE":
             base_nome = "Contraventamento"; cod_base = "CONTRAVENTAMENTO"
         else:
-            base_nome = cp_base.selectbox("Tipo de Base", list(mapa_base.keys()))
+            base_nome = cp_base.selectbox("Tipo de Base", list(mapa_base.keys()), key="sel_tipo_base")
             cod_base = mapa_base[base_nome]
             
         st.markdown("<div class='titulo-bloco'>GEOMETRIA</div>", unsafe_allow_html=True)
         c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-        qtd = c1.number_input("QTD", min_value=1, value=1)
-        comp = c2.number_input("C(mm)", min_value=100.0, value=1200.0, step=50.0)
-        larg = c3.number_input("L(mm)", min_value=100.0, value=600.0, step=50.0)
+        qtd = c1.number_input("QTD", min_value=1, value=1, key="num_qtd_param")
+        comp = c2.number_input("C(mm)", min_value=100.0, value=1200.0, step=50.0, key="num_comp_param")
+        larg = c3.number_input("L(mm)", min_value=100.0, value=600.0, step=50.0, key="num_larg_param")
         
         alt = 0.0; planos = 0
         if cod_tampo == "PRAT_PAREDE":
-            pass # Ficam ocultos/desativados visualmente
+            pass 
         elif "ESTANTE" in cod_tampo:
-            alt = c4.number_input("A(mm)", min_value=0.0, value=1800.0, step=50.0)
-            planos = c5.number_input("Planos", min_value=1, value=4)
+            alt = c4.number_input("A(mm)", min_value=0.0, value=1800.0, step=50.0, key="num_alt_param_est")
+            planos = c5.number_input("Planos", min_value=1, value=4, key="num_plan_param")
         else:
-            alt = c4.number_input("A(mm)", min_value=0.0, value=900.0, step=50.0)
+            alt = c4.number_input("A(mm)", min_value=0.0, value=900.0, step=50.0, key="num_alt_param_mesa")
             
         st.markdown("<div class='titulo-bloco'>CHAPAS PRINCIPAIS</div>", unsafe_allow_html=True)
         lbl_tampo = "Mat. Planos" if "ESTANTE" in cod_tampo else "Mat. Principal" if cod_tampo == "PRAT_PAREDE" else "Tampo"
         lbl_base = "Mat. Colunas" if "ESTANTE" in cod_tampo else "Base"
         
         cm1, ce1, cm2, ce2 = st.columns([1.5, 1, 1.5, 1], gap="small")
-        mat_tampo = cm1.selectbox(lbl_tampo, ["INOX 304", "INOX 430", "INOX 201"])
-        esp_tampo = ce1.selectbox("Esp." if cod_tampo == "PRAT_PAREDE" else "Esp. T", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"])
+        mat_tampo = cm1.selectbox(lbl_tampo, ["INOX 304", "INOX 430", "INOX 201"], key="sel_mat_tampo")
+        esp_tampo = ce1.selectbox("Esp." if cod_tampo == "PRAT_PAREDE" else "Esp. T", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_tampo")
         
         try: idx_base = ["INOX 304", "INOX 430", "INOX 201"].index(mat_tampo)
         except: idx_base = 1
         
         mat_base = "INOX 430"; esp_base = "Esp. Padrão"
         if cod_tampo != "PRAT_PAREDE" and cod_base != "CONTRAVENTAMENTO":
-            mat_base = cm2.selectbox(lbl_base, ["INOX 304", "INOX 430", "INOX 201"], index=idx_base)
-            esp_base = ce2.selectbox("Esp. B", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"])
+            mat_base = cm2.selectbox(lbl_base, ["INOX 304", "INOX 430", "INOX 201"], index=idx_base, key="sel_mat_base")
+            esp_base = ce2.selectbox("Esp. B", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_base")
 
         st.markdown("<div class='titulo-bloco'>REFORÇOS (CALDEIRARIA)</div>", unsafe_allow_html=True)
         lbl_ref1 = "Ref. Plano" if "ESTANTE" in cod_tampo else "Ref. Parede" if cod_tampo == "PRAT_PAREDE" else "Ref. Tampo"
         
         cr1, cr2, cr3, cr4, cr5, cr6 = st.columns(6, gap="small")
-        qtd_ref = cr1.selectbox("Qtd 1", ["Padrão", "0", "1", "2", "3", "4", "5", "6"])
-        mat_ref = cr2.selectbox("Mat 1", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_tampo) if mat_tampo in ["INOX 430", "INOX 304", "INOX 201"] else 0)
-        esp_ref = cr3.selectbox("Esp 1", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1)
+        qtd_ref = cr1.selectbox("Qtd 1", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref1")
+        mat_ref = cr2.selectbox("Mat 1", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_tampo) if mat_tampo in ["INOX 430", "INOX 304", "INOX 201"] else 0, key="sel_mat_ref1")
+        esp_ref = cr3.selectbox("Esp 1", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref1")
         mat_ref = f"INOX {mat_ref}"
 
         mat_ref_prat = "INOX 430"; esp_ref_prat = "0.8"; qtd_ref_prat = "Padrão"
         if "PRAT" in cod_base and cod_tampo != "PRAT_PAREDE" and "ESTANTE" not in cod_tampo:
-            qtd_ref_prat = cr4.selectbox("Qtd Prt", ["Padrão", "0", "1", "2", "3", "4", "5", "6"])
-            mat_ref_prat = cr5.selectbox("Mat Prt", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_base) if mat_base in ["INOX 430", "INOX 304", "INOX 201"] else 0)
-            esp_ref_prat = cr6.selectbox("Esp Prt", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1)
+            qtd_ref_prat = cr4.selectbox("Qtd Prt", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref2")
+            mat_ref_prat = cr5.selectbox("Mat Prt", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_base) if mat_base in ["INOX 430", "INOX 304", "INOX 201"] else 0, key="sel_mat_ref2")
+            esp_ref_prat = cr6.selectbox("Esp Prt", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref2")
             mat_ref_prat = f"INOX {mat_ref_prat}"
 
         st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        if st.button("➕ Adicionar ao Pedido", use_container_width=True, type="primary"):
+        if st.button("➕ Adicionar ao Pedido", use_container_width=True, type="primary", key="btn_add_param"):
             item = {
                 "num": len(st.session_state.carrinho) + 1, "tipo": "parametrico", "qtd": int(qtd),
                 "comp": float(comp), "larg": float(larg), "alt": float(alt), "planos": int(planos),
@@ -175,21 +175,21 @@ with col_esq:
     # ------------------ ITEM COMPOSTO ------------------
     with aba_comp:
         cm1, cm2 = st.columns([1, 3], gap="small")
-        qtd_item_comp = cm1.number_input("QTD Mód", min_value=1, value=1)
-        nome_item_comp = cm2.text_input("Nome Módulo", placeholder="Ex: Gaveteiro")
+        qtd_item_comp = cm1.number_input("QTD Mód", min_value=1, value=1, key="num_qtd_comp")
+        nome_item_comp = cm2.text_input("Nome Módulo", placeholder="Ex: Gaveteiro", key="txt_nome_comp")
         
         st.markdown("<div class='titulo-bloco'>PEÇAS DO MÓDULO</div>", unsafe_allow_html=True)
         cc1, cc2 = st.columns([3, 1], gap="small")
-        nome_pc = cc1.text_input("Nome da Peça", placeholder="Chapa lateral")
-        qtd_pc = cc2.number_input("Qtd", min_value=1, value=1)
+        nome_pc = cc1.text_input("Nome da Peça", placeholder="Chapa lateral", key="txt_nome_pc")
+        qtd_pc = cc2.number_input("Qtd", min_value=1, value=1, key="num_qtd_pc")
         
         cd1, cd2, cd3, cd4 = st.columns(4, gap="small")
-        comp_pc = cd1.number_input("C(mm) ", value=100.0, step=10.0)
-        larg_pc = cd2.number_input("L(mm) ", value=100.0, step=10.0)
-        mat_pc = cd3.selectbox("Mat", ["304", "430", "201"])
-        esp_pc = cd4.selectbox("Esp", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2)
+        comp_pc = cd1.number_input("C(mm) ", value=100.0, step=10.0, key="num_c_pc")
+        larg_pc = cd2.number_input("L(mm) ", value=100.0, step=10.0, key="num_l_pc")
+        mat_pc = cd3.selectbox("Mat", ["304", "430", "201"], key="sel_mat_pc")
+        esp_pc = cd4.selectbox("Esp", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2, key="sel_esp_pc")
         
-        if st.button("⏬ Inserir Peça", use_container_width=True):
+        if st.button("⏬ Inserir Peça", use_container_width=True, key="btn_inserir_pc"):
             if nome_pc:
                 st.session_state.pecas_temp_composto.append({
                     "nome": nome_pc, "qtd": int(qtd_pc), "comp": float(comp_pc), "larg": float(larg_pc),
@@ -202,7 +202,7 @@ with col_esq:
             st.dataframe(df_temp[["qtd", "nome", "mat"]].rename(columns={"qtd":"QTD", "nome":"PEÇA", "mat":"MAT"}), use_container_width=True, hide_index=True)
             
         st.markdown("<div style='margin-top:5px;'></div>", unsafe_allow_html=True)
-        if st.button("✅ EMPACOTAR ITEM E ADD", type="primary", use_container_width=True):
+        if st.button("✅ EMPACOTAR ITEM E ADD", type="primary", use_container_width=True, key="btn_empacotar"):
             if st.session_state.pecas_temp_composto and nome_item_comp:
                 item = {
                     "num": len(st.session_state.carrinho) + 1, "tipo": "composto",
@@ -216,17 +216,17 @@ with col_esq:
     # ------------------ PEÇA AVULSA ------------------
     with aba_livre:
         ca1, ca2 = st.columns([1, 3], gap="small")
-        qtd_livre = ca1.number_input("QTD", min_value=1, value=1)
-        nome_livre = ca2.text_input("Descrição", placeholder="Ex: Chapa de Proteção")
+        qtd_livre = ca1.number_input("QTD", min_value=1, value=1, key="num_qtd_livre")
+        nome_livre = ca2.text_input("Descrição", placeholder="Ex: Chapa de Proteção", key="txt_nome_livre")
         
         cl1, cl2, cl3, cl4 = st.columns(4, gap="small")
-        comp_livre = cl1.number_input("C Plan", value=500.0, step=10.0)
-        larg_livre = cl2.number_input("L Plan", value=500.0, step=10.0)
-        mat_livre = cl3.selectbox("Mat.", ["304", "430", "201"])
-        esp_livre = cl4.selectbox("Esp.", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2)
+        comp_livre = cl1.number_input("C Plan", value=500.0, step=10.0, key="num_c_livre")
+        larg_livre = cl2.number_input("L Plan", value=500.0, step=10.0, key="num_l_livre")
+        mat_livre = cl3.selectbox("Mat.", ["304", "430", "201"], key="sel_mat_livre")
+        esp_livre = cl4.selectbox("Esp.", ["0.6", "0.8", "1.0", "1.2", "1.5", "2.0"], index=2, key="sel_esp_livre")
         
         st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        if st.button("➕ Adicionar Peça Solta", type="primary", use_container_width=True):
+        if st.button("➕ Adicionar Peça Solta", type="primary", use_container_width=True, key="btn_add_livre"):
             if nome_livre:
                 item = {
                     "num": len(st.session_state.carrinho) + 1, "tipo": "livre", "qtd": int(qtd_livre),
@@ -243,11 +243,11 @@ with col_esq:
         st.dataframe(df_carrinho, hide_index=True, use_container_width=True)
         
         c_btn_limpar, c_btn_gerar = st.columns([1, 2], gap="small")
-        if c_btn_limpar.button("❌ Limpar", use_container_width=True):
+        if c_btn_limpar.button("❌ Limpar", use_container_width=True, key="btn_limpar_car"):
             st.session_state.carrinho = []
             st.rerun()
             
-        gerar_calc = c_btn_gerar.button("🚀 CALCULAR PROJETO", type="primary", use_container_width=True)
+        gerar_calc = c_btn_gerar.button("🚀 CALCULAR PROJETO", type="primary", use_container_width=True, key="btn_gerar_calc")
     else:
         st.info("O carrinho está vazio.")
         gerar_calc = False
@@ -335,7 +335,7 @@ with col_dir:
                         elif item["tipo"] == "parametrico":
                             e_base = any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA"])
                             p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
-                            if item["tampo_cod"] not in ["ESTANTE_LISA", "ESTANTE_GRADEADA", "PRAT_PAREDE"]:
+                            if item.get("tampo_cod") not in ["ESTANTE_LISA", "ESTANTE_GRADEADA", "PRAT_PAREDE"]:
                                 esp_tela = item["esp_base"] if e_base else item["esp_tampo"]
                                 if "CHAPA" in p["CÓDIGO"] and esp_tela != "Esp. Padrão":
                                     try: p["ESP"] = float(esp_tela)
