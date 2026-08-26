@@ -121,7 +121,6 @@ with col_esq:
         else:
             alt = c4.number_input("A(mm)", min_value=0.0, value=900.0, step=50.0, key="num_alt_param_mesa")
             
-        # ================= NOVO DESIGN EM LINHA =================
         st.markdown("<div class='titulo-bloco'>ESTRUTURA E REFORÇOS</div>", unsafe_allow_html=True)
         
         # --- LINHA 1: TAMPO / PLANO ---
@@ -150,7 +149,6 @@ with col_esq:
         mat_base = "INOX 430"; esp_base = "Esp. Padrão"
         mat_ref_prat = "INOX 430"; esp_ref_prat = "0.8"; qtd_ref_prat = "Padrão"
         
-        # Inteligência de exibição da segunda linha
         mostrar_linha_2 = False
         if "ESTANTE" in cod_tampo:
             mostrar_linha_2 = True
@@ -285,7 +283,7 @@ with col_esq:
 
 
 # ==========================================
-# 4. COLUNA DIREITA (DASHBOARD)
+# COLUNA DIREITA (DASHBOARD)
 # ==========================================
 with col_dir:
     if not st.session_state.carrinho:
@@ -324,14 +322,15 @@ with col_dir:
                     pb_cruas.append({"CÓDIGO": "CHAPA_LIVRE", "DESC": item["nome_peca"], "QTD": 1, "COMP PL": item["comp_pl"], "LARG PL": item["larg_pl"], "ESP": item["esp"], "PESO UNIT": peso_un, "MAT_CUSTOM": item["material"]})
 
                 peso_item_total = 0.0; custo_unit_item_chapa = 0.0; custo_unit_item_tubo = 0.0
-                
                 html_detalhamento += f"<div class='card-dark'><div class='item-title'>ITEM {item['num']}: {item.get('qtd', item.get('qtd_item',1))}x {item['desc_carrinho']}</div>"
                 
                 pecas_processadas = []
                 molde_reforco = None
 
+                # LÓGICA DE ENGENHARIA E CORREÇÃO DE MATERIAIS
                 for p in pb_cruas:
-                    if p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]: p["MAT_CUSTOM"] = "-"
+                    if p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]: 
+                        p["MAT_CUSTOM"] = "-"
                     else:
                         is_reforco = any(x in p["DESC"].upper() for x in ["REFORÇO", "REFORCO", "OMEGA"])
                         if is_reforco and "MAIOR" not in p["DESC"].upper(): molde_reforco = p.copy()
@@ -365,22 +364,38 @@ with col_dir:
                                 if qtd_r != "Padrão":
                                     if qtd_r == "0": continue
                                     p["QTD"] = int(qtd_r)
-                        elif item["tipo"] == "parametrico":
-                            e_base = any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA", "DIVISÓRIA", "SUPORTE"])
-                            p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
-                            if item.get("tampo_cod") not in ["ESTANTE_LISA", "ESTANTE_GRADEADA", "PRAT_PAREDE"]:
-                                esp_tela = item["esp_base"] if e_base else item["esp_tampo"]
-                                if ("CHAPA" in p["CÓDIGO"] or (p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-")) and "TUBO" not in p["CÓDIGO"]:
-                                    if esp_tela != "Esp. Padrão":
-                                        try: p["ESP"] = float(esp_tela)
-                                        except: pass
                                     
+                        elif item["tipo"] == "parametrico":
+                            e_base = False
+                            
+                            # NOVA REGRA PARA ESTANTES: Apenas a Coluna (e Sapata se aplicável) é Base. O resto é Plano(Tampo).
+                            if "ESTANTE" in item.get("tampo_cod", ""):
+                                if "COLUNA" in p["DESC"].upper() or "SAPATA" in p["DESC"].upper():
+                                    e_base = True
+                            else:
+                                if "TUBO" in p["CÓDIGO"] or any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA", "DIVISÓRIA", "SUPORTE"]):
+                                    e_base = True
+                                    
+                            if item.get("tampo_cod") == "PRAT_PAREDE": 
+                                e_base = False
+                                
+                            p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
+                            esp_tela = item["esp_base"] if e_base else item["esp_tampo"]
+                            
+                            # TRAVA DE ESPESSURA: Aplica para tudo que é chapa
+                            if ("CHAPA" in p["CÓDIGO"] or (p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-")) and "TUBO" not in p["CÓDIGO"]:
+                                if esp_tela != "Esp. Padrão":
+                                    try: p["ESP"] = float(esp_tela)
+                                    except: pass
+                                    
+                    # RECALCULO DE PESO: Garante que "Suportes" e outras chapas sejam recalculadas.
                     if p.get("MAT_CUSTOM") != "-" and "TUBO" not in p["CÓDIGO"]:
                         if p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-":
                             p["PESO UNIT"] = float(p["COMP PL"]) * float(p["LARG PL"]) * p["ESP"] * 0.000008
                         
                     pecas_processadas.append(p)
                 
+                # Injetor Prateleira Extra se Faltar
                 if item["tipo"] == "parametrico" and "PRAT" in item.get("base_cod", "") and not any(p["DESC"] == "REFORÇO PRATELEIRA" for p in pecas_processadas):
                     if molde_reforco:
                         ref_prat = molde_reforco.copy()
