@@ -50,7 +50,7 @@ st.markdown("""
     
     div.row-widget.stRadio > div { flex-direction: row; justify-content: center; background-color: #1e1e1e; padding: 10px; border-radius: 10px; }
     
-    .titulo-bloco { margin-top: 15px; margin-bottom: 5px; color: #f1c40f; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+    .titulo-bloco { margin-top: 15px; margin-bottom: 5px; color: #f1c40f; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,37 +121,56 @@ with col_esq:
         else:
             alt = c4.number_input("A(mm)", min_value=0.0, value=900.0, step=50.0, key="num_alt_param_mesa")
             
-        st.markdown("<div class='titulo-bloco'>CHAPAS PRINCIPAIS</div>", unsafe_allow_html=True)
-        lbl_tampo = "Mat. Planos" if "ESTANTE" in cod_tampo else "Mat. Principal" if cod_tampo == "PRAT_PAREDE" else "Tampo"
-        lbl_base = "Mat. Colunas" if "ESTANTE" in cod_tampo else "Base"
+        # ================= NOVO DESIGN EM LINHA =================
+        st.markdown("<div class='titulo-bloco'>ESTRUTURA E REFORÇOS</div>", unsafe_allow_html=True)
         
-        cm1, ce1, cm2, ce2 = st.columns([1.5, 1, 1.5, 1], gap="small")
-        mat_tampo = cm1.selectbox(lbl_tampo, ["INOX 304", "INOX 430", "INOX 201"], key="sel_mat_tampo")
-        esp_tampo = ce1.selectbox("Esp." if cod_tampo == "PRAT_PAREDE" else "Esp. T", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_tampo")
+        # --- LINHA 1: TAMPO / PLANO ---
+        lbl_tampo = "Plano" if "ESTANTE" in cod_tampo else "Principal" if cod_tampo == "PRAT_PAREDE" else "Tampo"
+        has_ref_tampo = cod_tampo != "ESTANTE_GRADEADA"
         
-        try: idx_base = ["INOX 304", "INOX 430", "INOX 201"].index(mat_tampo)
-        except: idx_base = 1
+        if has_ref_tampo:
+            c_mt, c_et, c_qr, c_mr, c_er = st.columns([1.5, 1, 1, 1.2, 1], gap="small")
+        else:
+            c_mt, c_et = st.columns([1.5, 1], gap="small")
+            
+        mat_tampo = c_mt.selectbox(lbl_tampo, ["INOX 304", "INOX 430", "INOX 201"], key="sel_mat_tampo")
+        esp_tampo = c_et.selectbox("Esp. (T)" if cod_tampo != "PRAT_PAREDE" else "Esp.", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_tampo")
         
+        mat_ref = "INOX 430"; esp_ref = "0.8"; qtd_ref = "Padrão"
+        if has_ref_tampo:
+            qtd_ref = c_qr.selectbox("Qtd Ref.", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref1")
+            idx_ref1 = ["INOX 430", "INOX 304", "INOX 201"].index(mat_tampo) if mat_tampo in ["INOX 430", "INOX 304", "INOX 201"] else 0
+            mat_ref = c_mr.selectbox("Mat. Ref.", ["430", "304", "201"], index=idx_ref1, key="sel_mat_ref1")
+            esp_ref = c_er.selectbox("Esp. Ref.", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref1")
+            mat_ref = f"INOX {mat_ref}"
+        else:
+            qtd_ref = "0" # Garante que não gere reforço pra gradeada
+
+        # --- LINHA 2: BASE / PRATELEIRA ---
         mat_base = "INOX 430"; esp_base = "Esp. Padrão"
-        if cod_tampo != "PRAT_PAREDE" and cod_base != "CONTRAVENTAMENTO":
-            mat_base = cm2.selectbox(lbl_base, ["INOX 304", "INOX 430", "INOX 201"], index=idx_base, key="sel_mat_base")
-            esp_base = ce2.selectbox("Esp. B", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_base")
-
-        st.markdown("<div class='titulo-bloco'>REFORÇOS (CALDEIRARIA)</div>", unsafe_allow_html=True)
-        lbl_ref1 = "Ref. Plano" if "ESTANTE" in cod_tampo else "Ref. Parede" if cod_tampo == "PRAT_PAREDE" else "Ref. Tampo"
-        
-        cr1, cr2, cr3, cr4, cr5, cr6 = st.columns(6, gap="small")
-        qtd_ref = cr1.selectbox("Qtd 1", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref1")
-        mat_ref = cr2.selectbox("Mat 1", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_tampo) if mat_tampo in ["INOX 430", "INOX 304", "INOX 201"] else 0, key="sel_mat_ref1")
-        esp_ref = cr3.selectbox("Esp 1", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref1")
-        mat_ref = f"INOX {mat_ref}"
-
         mat_ref_prat = "INOX 430"; esp_ref_prat = "0.8"; qtd_ref_prat = "Padrão"
-        if "PRAT" in cod_base and cod_tampo != "PRAT_PAREDE" and "ESTANTE" not in cod_tampo:
-            qtd_ref_prat = cr4.selectbox("Qtd Prt", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref2")
-            mat_ref_prat = cr5.selectbox("Mat Prt", ["430", "304", "201"], index=["INOX 430", "INOX 304", "INOX 201"].index(mat_base) if mat_base in ["INOX 430", "INOX 304", "INOX 201"] else 0, key="sel_mat_ref2")
-            esp_ref_prat = cr6.selectbox("Esp Prt", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref2")
-            mat_ref_prat = f"INOX {mat_ref_prat}"
+        
+        if cod_tampo != "PRAT_PAREDE" and cod_base != "CONTRAVENTAMENTO" and "ESTANTE" not in cod_tampo:
+            lbl_base = "Prateleira" if "PRAT" in cod_base else "Base"
+            has_ref_prat = "PRAT" in cod_base
+            
+            try: idx_base = ["INOX 304", "INOX 430", "INOX 201"].index(mat_tampo)
+            except: idx_base = 1
+            
+            if has_ref_prat:
+                c_mb, c_eb, c_qrp, c_mrp, c_erp = st.columns([1.5, 1, 1, 1.2, 1], gap="small")
+            else:
+                c_mb, c_eb = st.columns([1.5, 1], gap="small")
+                
+            mat_base = c_mb.selectbox(lbl_base, ["INOX 304", "INOX 430", "INOX 201"], index=idx_base, key="sel_mat_base")
+            esp_base = c_eb.selectbox("Esp. (B)", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_base")
+            
+            if has_ref_prat:
+                qtd_ref_prat = c_qrp.selectbox("Qtd Ref. Prt", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref2")
+                idx_ref2 = ["INOX 430", "INOX 304", "INOX 201"].index(mat_base) if mat_base in ["INOX 430", "INOX 304", "INOX 201"] else 0
+                mat_ref_prat = c_mrp.selectbox("Mat. Ref. Prt", ["430", "304", "201"], index=idx_ref2, key="sel_mat_ref2")
+                esp_ref_prat = c_erp.selectbox("Esp. Ref. Prt", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref2")
+                mat_ref_prat = f"INOX {mat_ref_prat}"
 
         st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
         if st.button("➕ Adicionar ao Pedido", use_container_width=True, type="primary", key="btn_add_param"):
@@ -299,13 +318,15 @@ with col_dir:
                 pecas_processadas = []
                 molde_reforco = None
 
-                # Engenharia Dinâmica dos Reforços
                 for p in pb_cruas:
                     if p["CÓDIGO"] in ["SAPATA", "PARAFUSO", "CUBA_PADRAO"]: p["MAT_CUSTOM"] = "-"
                     else:
                         is_reforco = any(x in p["DESC"].upper() for x in ["REFORÇO", "REFORCO", "OMEGA"])
                         if is_reforco and "MAIOR" not in p["DESC"].upper(): molde_reforco = p.copy()
+                        
+                        # Bloqueio de Reforço para Estante Gradeada e Mesa Lisa
                         if item.get("tampo_cod") == "LISA" and is_reforco and "MAIOR" in p["DESC"].upper(): continue
+                        if item.get("tampo_cod") == "ESTANTE_GRADEADA" and is_reforco: continue
                         
                         if is_reforco and item["tipo"] == "parametrico":
                             if "MAIOR" in p["DESC"].upper():
@@ -333,21 +354,21 @@ with col_dir:
                                     if qtd_r == "0": continue
                                     p["QTD"] = int(qtd_r)
                         elif item["tipo"] == "parametrico":
-                            e_base = any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA"])
+                            e_base = any(x in p["DESC"].upper() for x in ["PRAT", "GRADE", "PERNA", "CONTRA", "TRAVESSA", "COLUNA", "DIVISÓRIA", "SUPORTE"])
                             p["MAT_CUSTOM"] = item["mat_base"] if e_base else item["mat_tampo"]
                             if item.get("tampo_cod") not in ["ESTANTE_LISA", "ESTANTE_GRADEADA", "PRAT_PAREDE"]:
                                 esp_tela = item["esp_base"] if e_base else item["esp_tampo"]
-                                if "CHAPA" in p["CÓDIGO"] and esp_tela != "Esp. Padrão":
-                                    try: p["ESP"] = float(esp_tela)
-                                    except: pass
+                                if ("CHAPA" in p["CÓDIGO"] or (p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-")) and "TUBO" not in p["CÓDIGO"]:
+                                    if esp_tela != "Esp. Padrão":
+                                        try: p["ESP"] = float(esp_tela)
+                                        except: pass
                                     
-                    # Recalculo peso
-                    if "CHAPA" in p["CÓDIGO"] and p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-":
-                        p["PESO UNIT"] = float(p["COMP PL"]) * float(p["LARG PL"]) * p["ESP"] * 0.000008
+                    if p.get("MAT_CUSTOM") != "-" and "TUBO" not in p["CÓDIGO"]:
+                        if p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-":
+                            p["PESO UNIT"] = float(p["COMP PL"]) * float(p["LARG PL"]) * p["ESP"] * 0.000008
                         
                     pecas_processadas.append(p)
                 
-                # Injetor Prateleira Extra se Faltar
                 if item["tipo"] == "parametrico" and "PRAT" in item.get("base_cod", "") and not any(p["DESC"] == "REFORÇO PRATELEIRA" for p in pecas_processadas):
                     if molde_reforco:
                         ref_prat = molde_reforco.copy()
@@ -371,24 +392,25 @@ with col_dir:
                     custo_peca_un = 0.0
                     mat_peca = p.get("MAT_CUSTOM", "-")
                     
-                    if "CHAPA" in p["CÓDIGO"]:
-                        peso_peca = p.get("PESO UNIT", 0) * qtd_final
-                        if p.get("LARG PL", "-") != "-":
-                            for _ in range(qtd_final): pecas_para_nesting_global.append({'nome': p['DESC'], 'material': f"{mat_peca} {p.get('ESP','-')}mm", 'comp': float(p["COMP PL"]), 'larg': float(p["LARG PL"])})
-                        if p.get("ESP", 0) > 0:
-                            custo_peca_un = p["PESO UNIT"] * custo_chapa.get(mat_peca, {}).get(p["ESP"], 0.0)
-                            custo_unit_item_chapa += custo_peca_un * p["QTD"]
-                            resumo_geral_chapas[(mat_peca, p["ESP"])] = resumo_geral_chapas.get((mat_peca, p["ESP"]), 0) + peso_peca
-                        linha_med = f"{p['PESO UNIT']:.2f} KG un | {peso_peca:.2f} KG tot".replace('.',',')
-
-                    elif "TUBO" in p["CÓDIGO"]:
+                    if "TUBO" in p["CÓDIGO"]:
                         metros_unit = float(p.get("COMP PL", 0)) / 1000.0
                         metros_tot = metros_unit * qtd_final
                         peso_peca = 0
                         custo_peca_un = metros_unit * custo_tubo.get(p["CÓDIGO"], 0.0)
                         custo_unit_item_tubo += custo_peca_un * p["QTD"]
-                        resumo_geral_tubos[p["CÓDIGO"]] = resumo_geral_tubos.get(p["CÓDIGO"], 0) + (float(p["COMP PL"]) * qtd_final)
+                        resumo_geral_tubos[p["CÓDIGO"]] = resumo_geral_tubos.get(p["CÓDIGO"], 0) + (float(p.get("COMP PL", 0)) * qtd_final)
                         linha_med = f"{metros_unit:.2f} M un | {metros_tot:.2f} M tot".replace('.',',')
+                    
+                    elif "CHAPA" in p["CÓDIGO"] or (p.get("COMP PL", "-") != "-" and p.get("LARG PL", "-") != "-"):
+                        peso_peca = p.get("PESO UNIT", 0) * qtd_final
+                        if p.get("LARG PL", "-") != "-":
+                            for _ in range(qtd_final): pecas_para_nesting_global.append({'nome': p['DESC'], 'material': f"{mat_peca} {p.get('ESP','-')}mm", 'comp': float(p["COMP PL"]), 'larg': float(p["LARG PL"])})
+                        if p.get("ESP", 0) > 0:
+                            custo_peca_un = p.get("PESO UNIT", 0) * custo_chapa.get(mat_peca, {}).get(p["ESP"], 0.0)
+                            custo_unit_item_chapa += custo_peca_un * p["QTD"]
+                            resumo_geral_chapas[(mat_peca, p["ESP"])] = resumo_geral_chapas.get((mat_peca, p["ESP"]), 0) + peso_peca
+                        linha_med = f"{p.get('PESO UNIT', 0):.2f} KG un | {peso_peca:.2f} KG tot".replace('.',',')
+                        
                     else:
                         peso_peca = 0
                         linha_med = "- | -"
