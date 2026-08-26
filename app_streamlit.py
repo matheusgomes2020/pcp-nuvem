@@ -125,7 +125,7 @@ with col_esq:
         st.markdown("<div class='titulo-bloco'>ESTRUTURA E REFORÇOS</div>", unsafe_allow_html=True)
         
         # --- LINHA 1: TAMPO / PLANO ---
-        lbl_tampo = "Plano" if "ESTANTE" in cod_tampo else "Principal" if cod_tampo == "PRAT_PAREDE" else "Tampo"
+        lbl_tampo = "Planos" if "ESTANTE" in cod_tampo else "Principal" if cod_tampo == "PRAT_PAREDE" else "Tampo"
         has_ref_tampo = cod_tampo != "ESTANTE_GRADEADA"
         
         if has_ref_tampo:
@@ -144,16 +144,24 @@ with col_esq:
             esp_ref = c_er.selectbox("Esp. Ref.", ["0.6", "0.8", "1.0", "1.2", "1.5"], index=1, key="sel_esp_ref1")
             mat_ref = f"INOX {mat_ref}"
         else:
-            qtd_ref = "0" # Garante que não gere reforço pra gradeada
+            qtd_ref = "0"
 
-        # --- LINHA 2: BASE / PRATELEIRA ---
+        # --- LINHA 2: BASE / COLUNAS / PRATELEIRA ---
         mat_base = "INOX 430"; esp_base = "Esp. Padrão"
         mat_ref_prat = "INOX 430"; esp_ref_prat = "0.8"; qtd_ref_prat = "Padrão"
         
-        if cod_tampo != "PRAT_PAREDE" and cod_base != "CONTRAVENTAMENTO" and "ESTANTE" not in cod_tampo:
+        # Inteligência de exibição da segunda linha
+        mostrar_linha_2 = False
+        if "ESTANTE" in cod_tampo:
+            mostrar_linha_2 = True
+            lbl_base = "Colunas"
+            has_ref_prat = False
+        elif cod_tampo != "PRAT_PAREDE" and cod_base != "CONTRAVENTAMENTO":
+            mostrar_linha_2 = True
             lbl_base = "Prateleira" if "PRAT" in cod_base else "Base"
             has_ref_prat = "PRAT" in cod_base
             
+        if mostrar_linha_2:
             try: idx_base = ["INOX 304", "INOX 430", "INOX 201"].index(mat_tampo)
             except: idx_base = 1
             
@@ -163,7 +171,7 @@ with col_esq:
                 c_mb, c_eb = st.columns([1.5, 1], gap="small")
                 
             mat_base = c_mb.selectbox(lbl_base, ["INOX 304", "INOX 430", "INOX 201"], index=idx_base, key="sel_mat_base")
-            esp_base = c_eb.selectbox("Esp. (B)", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_base")
+            esp_base = c_eb.selectbox("Esp. (C)" if "ESTANTE" in cod_tampo else "Esp. (B)", ["Esp. Padrão", "0.8", "1.0", "1.2", "1.5", "2.0"], key="sel_esp_base")
             
             if has_ref_prat:
                 qtd_ref_prat = c_qrp.selectbox("Qtd Ref. Prt", ["Padrão", "0", "1", "2", "3", "4", "5", "6"], key="sel_qtd_ref2")
@@ -182,11 +190,15 @@ with col_esq:
                 "mat_ref": mat_ref, "esp_ref": esp_ref, "qtd_ref": qtd_ref,
                 "mat_ref_prat": mat_ref_prat, "esp_ref_prat": esp_ref_prat, "qtd_ref_prat": qtd_ref_prat
             }
-            if "ESTANTE" in cod_tampo: item["desc_carrinho"] = f"{tampo_nome} {planos} Pl ({int(comp)}x{int(larg)}x{int(alt)}) - {mat_tampo}"
-            elif cod_tampo == "PRAT_PAREDE": item["desc_carrinho"] = f"{tampo_nome} ({int(comp)}x{int(larg)}) - {mat_tampo}"
+            if "ESTANTE" in cod_tampo: 
+                item["desc_carrinho"] = f"{tampo_nome} {planos} Pl ({int(comp)}x{int(larg)}x{int(alt)}) - Pl: {mat_tampo} | Col: {mat_base}"
+            elif cod_tampo == "PRAT_PAREDE": 
+                item["desc_carrinho"] = f"{tampo_nome} ({int(comp)}x{int(larg)}) - {mat_tampo}"
             else: 
-                if cod_base == "CONTRAVENTAMENTO": item["desc_carrinho"] = f"{tampo_nome} c/ Contra. ({int(comp)}x{int(larg)}x{int(alt)}) - {mat_tampo}"
-                else: item["desc_carrinho"] = f"{tampo_nome} c/ {base_nome} ({int(comp)}x{int(larg)}x{int(alt)})"
+                if cod_base == "CONTRAVENTAMENTO": 
+                    item["desc_carrinho"] = f"{tampo_nome} c/ Contra. ({int(comp)}x{int(larg)}x{int(alt)}) - {mat_tampo}"
+                else: 
+                    item["desc_carrinho"] = f"{tampo_nome} c/ {base_nome} ({int(comp)}x{int(larg)}x{int(alt)}) - T: {mat_tampo} | B: {mat_base}"
             
             st.session_state.carrinho.append(item)
             st.rerun()
